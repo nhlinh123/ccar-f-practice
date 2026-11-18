@@ -61,6 +61,12 @@ def unwrap_p(s):
     return m.group(1) if m and '<p>' not in m.group(1) else s
 
 
+def text_key(s):
+    """Normalized question text, used to spot duplicates that differ only in markup."""
+    t = html.unescape(re.sub(r'<[^>]+>', ' ', s))
+    return re.sub(r'[^0-9a-zà-ỹ]+', ' ', t.lower()).strip()
+
+
 def parse(path):
     src = open(path, encoding='utf-8', errors='replace').read()
     blocks = re.findall(r'<details class="qblock">.*?</details>', src, re.S)
@@ -71,10 +77,10 @@ def parse(path):
             'Re-save the full practice page and try again.'
         )
 
-    qs, notes = {}, []
+    rows, notes = [], []
     for b in blocks:
         qid = re.search(r'data-question-id="(\d+)"', b)
-        qid = qid.group(1) if qid else str(len(qs) + 1)
+        qid = qid.group(1) if qid else str(len(rows) + 1)
         q = re.sub(r'<span class="qnum">.*?</span>', '', re.search(r'<summary>(.*?)</summary>', b, re.S).group(1))
         opts = sorted(re.findall(
             r'<label for="answer-\d+-([A-Z])".*?<div class="practice-option-content">(.*?)</div>', b, re.S))
@@ -98,30 +104,47 @@ def parse(path):
         expl = re.sub(r'(<p>|<strong>)([A-D])\.', r'\1{{\2}}.', expl)
         expl = re.sub(r'\(([A-D])\)', r'({{\1}})', expl)
 
-        qs[qid] = {
+        rows.append({
+            'id': qid,
             'q': unwrap_p(clean(q)),
             'options': [unwrap_p(clean(o)) for _, o in opts],  # original A, B, C, D order
             'answer': letters.index(key),
             'explanation': expl,
-        }
+        })
 
-    report(qs, len(blocks), notes)
-    return list(qs.values())
+    # Keep only distinct questions: the same scenario can appear twice in a bank dump.
+    unique, seen = [], {}
+    for r in rows:
+        k = text_key(r['q'])
+        if k in seen:
+            prev = seen[k]
+            why = 'same answer' if prev['answer'] == r['answer'] else \
+                  f'CONFLICTING answer {prev["answer"]} vs {r["answer"]}'
+            notes.append(f'id {r["id"]}: duplicate of id {prev["id"]} ({why}) -> dropped')
+            continue
+        seen[k] = r
+        unique.append(r)
+
+    report(unique, rows, len(blocks), notes)
+    return unique
 
 
-def report(qs, blocks, notes):
-    bad_opts = [k for k, v in qs.items() if not 2 <= len(v['options']) <= 6]
-    no_expl = [k for k, v in qs.items() if not v['explanation']]
-    out_of_range = [k for k, v in qs.items() if not 0 <= v['answer'] < len(v['options'])]
-    print(f'{blocks} blocks -> {len(qs)} questions')
-    print(f'  with explanation: {len(qs) - len(no_expl)}')
-    print(f'  option counts:    {sorted({len(v["options"]) for v in qs.values()})}')
-    for label, ids in (('bad option count', bad_opts), ('no explanation', no_expl), ('answer out of range', out_of_range)):
-        if ids:
-            print(f'  WARNING {label}: {", ".join(ids[:12])}{" ..." if len(ids) > 12 else ""}')
+def report(qs, rows, blocks, notes):
+    ids = [r['id'] for r in qs]
+    bad_opts = [r['id'] for r in qs if not 2 <= len(r['options']) <= 6]
+    no_expl = [r['id'] for r in qs if not r['explanation']]
+    out_of_range = [r['id'] for r in qs if not 0 <= r['answer'] < len(r['options'])]
+    print(f'{blocks} blocks -> {len(rows)} parsed -> {len(qs)} unique questions')
+    print(f'  duplicates dropped: {len(rows) - len(qs)}')
+    print(f'  with explanation:   {len(qs) - len(no_expl)}')
+    print(f'  option counts:      {sorted({len(r["options"]) for r in qs})}')
+    for label, bad in (('bad option count', bad_opts), ('no explanation', no_expl), ('answer out of range', out_of_range)):
+        if bad:
+            print(f'  WARNING {label}: {", ".join(bad[:12])}{" ..." if len(bad) > 12 else ""}')
     if notes:
         print('\n'.join(notes))
-    print(f'  answer distribution: {[sum(1 for v in qs.values() if v["answer"] == i) for i in range(4)]}')
+    print(f'  answer distribution: {[sum(1 for r in qs if r["answer"] == i) for i in range(4)]}')
+    print(f'  first/last id: {ids[0] if ids else "-"} .. {ids[-1] if ids else "-"}')
 
 
 def main():

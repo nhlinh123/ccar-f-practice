@@ -6,7 +6,7 @@ Bản này dựng lại đúng bộ tính năng của `cca-f_practice` nhưng v�
 
 ## Tính năng
 
-- **Hai chế độ**: đề thi ngẫu nhiên (63 câu, đúng độ dài kỳ thi thật) và toàn bộ ngân hàng.
+- **Hai chế độ**: đề thi ngẫu nhiên (60 câu, đúng độ dài kỳ thi thật) và toàn bộ ngân hàng.
 - **Trộn câu + trộn đáp án** mỗi lần bắt đầu; phần giải thích tự đổi chữ cái A/B/C/D theo thứ tự mới.
 - **Chấm ngay**: đúng lên xanh + confetti, sai rung nhẹ + hiện giải thích.
 - **Đồng hồ**, **điểm**, **chuỗi đúng liên tiếp** ngay trên đầu bài.
@@ -46,7 +46,7 @@ python -m http.server 8080
 Sửa `CFG` ở đầu khối script trong `index.html`:
 
 ```js
-const CFG = { exam: 63, pass: 0.8 };   // số câu mỗi đề, tỉ lệ đạt
+const CFG = { exam: 60, pass: 0.8 };   // số câu mỗi đề, tỉ lệ đạt
 ```
 
 ## Triển khai
