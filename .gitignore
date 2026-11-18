@@ -1,0 +1,8 @@
+# local preview / debug artifacts
+_edge/
+_dom.html
+_*.html
+_*.png
+_*.js
+__pycache__/
+.DS_Store
