@@ -230,6 +230,9 @@ kbd{
   box-shadow:0 0 0 1px rgba(52,211,153,.25),0 20px 46px -24px rgba(52,211,153,.95)}
 .opt.correct .key{background:var(--ok);color:#032a1d;border-color:transparent}
 .opt.correct .mark{opacity:1;background:rgba(52,211,153,.22);color:var(--ok)}
+.opt.sel{background:rgba(34,211,238,.12);border-color:rgba(34,211,238,.75);
+  box-shadow:0 0 0 1px rgba(34,211,238,.3),0 16px 38px -24px rgba(34,211,238,.95)}
+.opt.sel .key{background:linear-gradient(135deg,var(--cy),var(--vi));color:#080a1f;border-color:transparent;transform:scale(1.05)}
 .opt.wrong{background:rgba(251,113,133,.1);border-color:rgba(251,113,133,.62)}
 .opt.wrong .key{background:var(--bad);color:#3d0714;border-color:transparent}
 .opt.wrong .mark{opacity:1;background:rgba(251,113,133,.2);color:var(--bad)}
@@ -257,7 +260,10 @@ kbd{
   padding:13px 26px;border-radius:15px;font-weight:700;letter-spacing:.005em;overflow:hidden;
   transition:transform .22s cubic-bezier(.2,.8,.2,1),box-shadow .25s,background .25s,border-color .25s
 }
-.btn:active{transform:scale(.975)}
+.btn:hover{transform:translateY(-2px)}
+.btn:active{transform:translateY(0) scale(.975)}
+.btn:disabled{opacity:.42;cursor:not-allowed;transform:none!important;box-shadow:none!important;filter:saturate(.5)}
+.btn:disabled::after{display:none}
 .btn.primary{
   color:#070a1c;border:1px solid rgba(255,255,255,.25);
   background:linear-gradient(135deg,#22d3ee,#a78bfa 52%,#f472b6);
@@ -425,6 +431,8 @@ dl.keys dd{margin:0}
 [data-theme] .pill.streak{color:var(--ink);background:var(--bg);border-color:var(--stroke)}
 [data-theme] .pill.score b{color:var(--ok)}
 [data-theme] .rv-card .chip{background:var(--bg);border-color:var(--bad);color:var(--bad)}
+[data-theme] .opt.sel{background:var(--soft);border-color:var(--ink);box-shadow:none}
+[data-theme] .opt.sel .key{background:var(--ink);color:var(--bg)}
 [data-theme] .verdict.ok .ico,[data-theme] .verdict.bad .ico{background:var(--soft);box-shadow:none}
 
 /* ============================================================
@@ -537,7 +545,7 @@ dl.keys dd{margin:0}
     <div class="rail" role="progressbar" aria-label="Tiến độ bài làm" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="rail"><i id="progress"></i></div>
 
     <article class="card glass" id="card">
-      <div class="qtag">Tình huống</div>
+      <div class="qtag" id="qtag">Tình huống</div>
       <div class="qtext" id="q"></div>
       <div class="opts" id="opts" role="group" aria-label="Các đáp án"></div>
       <div id="after" hidden>
@@ -661,14 +669,22 @@ dl.keys dd{margin:0}
   const reduceMotion = () => root.classList.contains('no-anim') || matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   /* ---------- bank ---------- */
+  // A question is either {answer: 1} (single choice) or {answers: [0, 2]} (multiple response).
   const raw = Array.isArray(window.QUESTIONS) ? window.QUESTIONS : [];
-  const bank = raw.filter((q) => q && typeof q.q === 'string' && Array.isArray(q.options) && q.options.length > 1).map((q) => ({
-    q: q.q,
-    options: q.options,
-    answer: typeof q.answer === 'number' ? q.answer : Math.max(0, LETTERS.indexOf(String(q.answer || '').toUpperCase())),
-    explanation: q.explanation || '',
-  }));
+  const toAnswers = (q) => {
+    const n = q.options.length;
+    const valid = (list) => [...new Set(list.map(Number).filter((x) => Number.isInteger(x) && x >= 0 && x < n))].sort((a, b) => a - b);
+    if (Array.isArray(q.answers) && q.answers.length) return valid(q.answers);
+    if (Array.isArray(q.answer)) return valid(q.answer);
+    if (typeof q.answer === 'number') return valid([q.answer]);
+    return valid(String(q.answer || '').toUpperCase().split('').map((c) => LETTERS.indexOf(c)).filter((x) => x >= 0));
+  };
+  const bank = raw
+    .filter((q) => q && typeof q.q === 'string' && Array.isArray(q.options) && q.options.length > 1)
+    .map((q) => ({ q: q.q, options: q.options, explanation: q.explanation || '' , answers: toAnswers(q) }))
+    .filter((q) => q.answers.length);
   const EXAM_SIZE = Math.min(CFG.exam, bank.length || CFG.exam);
+  const multiCount = bank.filter((q) => q.answers.length > 1).length;
 
   /* ---------- state ---------- */
   let deck = [], i = 0, score = 0, streak = 0, maxStreak = 0, wrong = [], answered = false, mode = 'exam';
@@ -753,6 +769,10 @@ dl.keys dd{margin:0}
   $('examSize').textContent = EXAM_SIZE;
   $('examNum').textContent = EXAM_SIZE;
   $('allNum').textContent = bank.length;
+  if (multiCount) {
+    document.querySelector('.lede').insertAdjacentHTML('beforeend',
+      `<span class="sep">·</span><b>${multiCount}</b> câu chọn nhiều đáp án`);
+  }
   if (!bank.length) {
     $('home').insertAdjacentHTML('beforeend',
       '<p style="margin-top:26px;padding:16px;border-radius:14px;border:1px solid rgba(251,113,133,.5);background:rgba(251,113,133,.1);text-align:center">' +
@@ -808,10 +828,12 @@ dl.keys dd{margin:0}
   function render() {
     const q = deck[i];
     answered = false;
+    const multi = q.answers.length > 1;
     $('pos').textContent = `Câu ${i + 1} / ${deck.length}`;
     $('progress').style.width = (i / deck.length) * 100 + '%';
     $('rail').setAttribute('aria-valuenow', String(Math.round((i / deck.length) * 100)));
     $('q').innerHTML = q.q;
+    $('qtag').textContent = multi ? `Chọn ${q.answers.length} đáp án` : 'Tình huống';
 
     const frag = document.createDocumentFragment();
     q.order.forEach((k, pos) => {
@@ -820,6 +842,7 @@ dl.keys dd{margin:0}
       b.type = 'button';
       b.dataset.k = k;
       b.style.setProperty('--i', pos);
+      b.setAttribute('aria-pressed', 'false');
       const key = document.createElement('span');
       key.className = 'key';
       key.textContent = LETTERS[pos];
@@ -829,31 +852,54 @@ dl.keys dd{margin:0}
       const mark = document.createElement('span');
       mark.className = 'mark';
       b.append(key, txt, mark);
-      b.addEventListener('click', () => check(b));
+      b.addEventListener('click', () => select(b));
       frag.append(b);
     });
     $('opts').replaceChildren(frag);
     $('opts').classList.remove('done');
     $('after').hidden = true;
-    $('next').hidden = true;
+    $('next').hidden = !multi;
+    $('next').disabled = multi;
+    $('next').textContent = multi ? 'Chấm đáp án' : 'Câu tiếp →';
     $('card').classList.remove('shake', 'done-glow');
     replay($('card'), 'enter');
   }
 
-  function check(btn) {
-    if (answered || !btn) return;
+  // Single-choice questions grade on click; multiple-response ones toggle and need a submit.
+  function select(btn) {
+    if (!btn || answered) return;
+    const q = deck[i];
+    if (q.answers.length === 1) { grade([Number(btn.dataset.k)], btn); return; }
+    const on = btn.classList.toggle('sel');
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    const picked = [...$('opts').children].filter((o) => o.classList.contains('sel')).length;
+    $('next').disabled = picked === 0;
+    $('next').textContent = picked ? `Chấm đáp án (${picked})` : 'Chấm đáp án';
+    sfx('tick');
+  }
+
+  function submitSelection() {
+    const picked = [...$('opts').children].filter((o) => o.classList.contains('sel')).map((o) => Number(o.dataset.k));
+    if (picked.length) grade(picked, $('opts').querySelector('.sel'));
+  }
+
+  function grade(picked, fromEl) {
     answered = true;
-    const q = deck[i], picked = Number(btn.dataset.k), ok = picked === q.answer;
+    const q = deck[i];
+    const ok = picked.length === q.answers.length && q.answers.every((k) => picked.includes(k));
 
     for (const o of $('opts').children) {
       const k = Number(o.dataset.k);
+      const isCorrect = q.answers.includes(k), isPicked = picked.includes(k);
       o.disabled = true;
+      o.classList.remove('sel');
+      o.setAttribute('aria-pressed', isPicked ? 'true' : 'false');
       o.querySelector('.mark').textContent = '';
-      if (k === q.answer) {
+      if (isCorrect) {
         o.classList.add('correct');
         o.querySelector('.mark').textContent = 'Đáp án';
-        if (k === picked) o.classList.add('picked');
-      } else if (o === btn) {
+        if (isPicked) o.classList.add('picked');
+      } else if (isPicked) {
         o.classList.add('wrong');
         o.querySelector('.mark').textContent = 'Bạn chọn';
       } else {
@@ -866,7 +912,7 @@ dl.keys dd{margin:0}
       $('score').textContent = String(score);
       replay($('score'), 'bump');
       replay($('card'), 'done-glow');
-      confetti(btn);
+      confetti(fromEl || $('next'));
       sfx('ok');
     } else {
       streak = 0;
@@ -886,6 +932,7 @@ dl.keys dd{margin:0}
     $('explain').innerHTML = relabel(q);
     $('after').hidden = false;
     $('next').hidden = false;
+    $('next').disabled = false;
     $('next').textContent = i + 1 < deck.length ? 'Câu tiếp →' : 'Xem kết quả ✦';
     $('next').focus({ preventScroll: true });
   }
@@ -1004,8 +1051,9 @@ dl.keys dd{margin:0}
       card.className = 'glass rv-card';
       card.style.setProperty('--i', n);
       const opts = q.order.map((k, pos) => {
-        const cls = k === q.answer ? 'correct' : k === q.picked ? 'wrong' : 'fade';
-        const tag = k === q.answer ? 'Đáp án' : k === q.picked ? 'Bạn chọn' : '';
+        const isCorrect = q.answers.includes(k), isPicked = q.picked.includes(k);
+        const cls = isCorrect ? 'correct' : isPicked ? 'wrong' : 'fade';
+        const tag = isCorrect ? 'Đáp án' : isPicked ? 'Bạn chọn' : '';
         return `<div class="opt ${cls}"><span class="key">${LETTERS[pos]}</span><span class="txt">${q.options[k]}</span><span class="mark">${tag}</span></div>`;
       }).join('');
       card.innerHTML = `<span class="chip">Câu ${q.no}</span><div class="qtext">${q.q}</div>`
@@ -1022,7 +1070,7 @@ dl.keys dd{margin:0}
 
   /* ---------- wiring ---------- */
   document.querySelectorAll('.mode').forEach((b) => { b.onclick = () => start(b.dataset.n); });
-  $('next').onclick = next;
+  $('next').onclick = () => { if (!answered) submitSelection(); else next(); };
   $('quit').onclick = () => { if (confirm('Thoát bài đang làm? Tiến độ sẽ không được lưu.')) show('home'); };
   $('home2').onclick = () => show('home');
   $('again').onclick = $('again2').onclick = () => start(mode);
@@ -1057,8 +1105,14 @@ dl.keys dd{margin:0}
     if ($('quiz').hidden) return;
     const lower = e.key.toLowerCase();
     const k = 'abcd'.includes(lower) ? 'abcd'.indexOf(lower) : '1234'.indexOf(e.key);
-    if (!answered && k >= 0 && k < $('opts').children.length) check($('opts').children[k]);
-    else if (e.key === 'Enter' && answered && document.activeElement !== $('next')) { e.preventDefault(); next(); }
+    if (!answered && k >= 0 && k < $('opts').children.length) { select($('opts').children[k]); return; }
+    if (e.key !== 'Enter') return;
+    if (!answered) {
+      if (!$('next').hidden && !$('next').disabled) { e.preventDefault(); submitSelection(); }
+    } else if (document.activeElement !== $('next')) {
+      e.preventDefault();
+      next();
+    }
   });
 
   /* ---------- deep link: #exam / #all starts a run ---------- */

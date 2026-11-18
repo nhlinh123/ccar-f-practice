@@ -7,6 +7,7 @@ Bản này dựng lại đúng bộ tính năng của `cca-f_practice` nhưng v�
 ## Tính năng
 
 - **Hai chế độ**: đề thi ngẫu nhiên (60 câu, đúng độ dài kỳ thi thật) và toàn bộ ngân hàng.
+- **Hai dạng câu hỏi**: một đáp án (chấm ngay khi bấm) và **chọn nhiều đáp án** (bấm chọn nhiều ô rồi "Chấm đáp án", đúng khi chọn đủ và không thừa).
 - **Trộn câu + trộn đáp án** mỗi lần bắt đầu; phần giải thích tự đổi chữ cái A/B/C/D theo thứ tự mới.
 - **Chấm ngay**: đúng lên xanh + confetti, sai rung nhẹ + hiện giải thích.
 - **Đồng hồ**, **điểm**, **chuỗi đúng liên tiếp** ngay trên đầu bài.

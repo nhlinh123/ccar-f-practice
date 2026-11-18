@@ -67,6 +67,41 @@ def text_key(s):
     return re.sub(r'[^0-9a-zà-ỹ]+', ' ', t.lower()).strip()
 
 
+KEY_ATTRS = ('data-correct-options', 'data-correct-answers', 'data-correct-option')
+
+
+def correct_keys(block):
+    """Return (letters, how) for the correct option(s) — single or multiple-response."""
+    for attr in KEY_ATTRS:
+        m = re.search(rf'{attr}="([^"]*)"', block)
+        if m:
+            letters = re.findall(r'[A-F]', m.group(1).upper())
+            if letters:
+                return letters, attr
+    checked = re.findall(r'<input[^>]*id="answer-\d+-([A-F])"[^>]*checked', block)
+    if checked:
+        return checked, 'checked input'
+    if re.search(r'<input[^>]*type="checkbox"', block):
+        return [], 'checkbox'
+    return [], 'none'
+
+
+def stated_keys(expl):
+    """Letters the explanation's "3. Đáp án" section lists — used to cross-check the site key."""
+    m = re.search(r'3\. Đáp án</h4>(.*?)(?=<h4|</section>)', expl, re.S)
+    if not m:
+        return []
+    letters = []
+    for lm in re.finditer(r'(?:<li>|<p>|<strong>)\s*(?:<p>|<strong>)?\s*([A-F])[.)]', m.group(1)):
+        if lm.group(1) not in letters:
+            letters.append(lm.group(1))
+    return letters[:4]
+
+
+def ans_of(row):
+    return row['answers'] if 'answers' in row else [row['answer']]
+
+
 def parse(path):
     src = open(path, encoding='utf-8', errors='replace').read()
     blocks = re.findall(r'<details class="qblock">.*?</details>', src, re.S)
@@ -77,7 +112,7 @@ def parse(path):
             'Re-save the full practice page and try again.'
         )
 
-    rows, notes = [], []
+    rows, notes, notes_multi = [], [], []
     for b in blocks:
         qid = re.search(r'data-question-id="(\d+)"', b)
         qid = qid.group(1) if qid else str(len(rows) + 1)
@@ -85,18 +120,25 @@ def parse(path):
         opts = sorted(re.findall(
             r'<label for="answer-\d+-([A-Z])".*?<div class="practice-option-content">(.*?)</div>', b, re.S))
         letters = [L for L, _ in opts]
-        key = re.search(r'data-correct-option="([A-Z])"', b).group(1)
+        keys, how = correct_keys(b)
         m = re.search(r'<div class="practice-explanation-content">(.*?)</div>\s*</section>', b, re.S)
         expl = m.group(1) if m else ''
 
-        # The site key is occasionally wrong; when the explanation states its answer letter, trust it.
-        stated = re.search(r'3\. Đáp án</h4>\s*(?:<ul>\s*<li>)?\s*(?:<p>|<strong>)?\s*([A-D])\.', expl)
-        if stated and stated.group(1) != key:
-            notes.append(f'id {qid}: site key {key} -> explanation says {stated.group(1)}')
-            key = stated.group(1)
+        # Some items are multiple-response ("select two"): the page then marks more than one option.
+        if len(keys) > 1:
+            notes_multi.append(qid)
+        if 'checkbox' in how:
+            notes.append(f'id {qid}: options use checkboxes ({how})')
 
-        if key not in letters:
-            notes.append(f'id {qid}: skipped (correct letter {key} not among options {letters})')
+        # The site key is occasionally wrong; when the explanation states its answer letter, trust it.
+        stated = stated_keys(expl)
+        if stated and set(stated) != set(keys):
+            notes.append(f'id {qid}: site key {"/".join(keys)} -> explanation says {"/".join(stated)}')
+            keys = stated
+
+        missing = [k for k in keys if k not in letters]
+        if missing or not keys:
+            notes.append(f'id {qid}: skipped (correct letters {keys or "none"} not among options {letters})')
             continue
 
         expl = clean(expl)
@@ -104,13 +146,18 @@ def parse(path):
         expl = re.sub(r'(<p>|<strong>)([A-D])\.', r'\1{{\2}}.', expl)
         expl = re.sub(r'\(([A-D])\)', r'({{\1}})', expl)
 
-        rows.append({
+        row = {
             'id': qid,
             'q': unwrap_p(clean(q)),
             'options': [unwrap_p(clean(o)) for _, o in opts],  # original A, B, C, D order
-            'answer': letters.index(key),
             'explanation': expl,
-        })
+        }
+        answers = sorted(letters.index(k) for k in keys)
+        if len(answers) == 1:
+            row['answer'] = answers[0]
+        else:
+            row['answers'] = answers  # multiple-response question
+        rows.append(row)
 
     # Keep only distinct questions: the same scenario can appear twice in a bank dump.
     unique, seen = [], {}
@@ -118,23 +165,26 @@ def parse(path):
         k = text_key(r['q'])
         if k in seen:
             prev = seen[k]
-            why = 'same answer' if prev['answer'] == r['answer'] else \
-                  f'CONFLICTING answer {prev["answer"]} vs {r["answer"]}'
+            why = 'same answer' if ans_of(prev) == ans_of(r) else \
+                  f'CONFLICTING answer {ans_of(prev)} vs {ans_of(r)}'
             notes.append(f'id {r["id"]}: duplicate of id {prev["id"]} ({why}) -> dropped')
             continue
         seen[k] = r
         unique.append(r)
 
-    report(unique, rows, len(blocks), notes)
+    report(unique, rows, len(blocks), notes, notes_multi)
     return unique
 
 
-def report(qs, rows, blocks, notes):
+def report(qs, rows, blocks, notes, notes_multi=()):
     ids = [r['id'] for r in qs]
+    multi = [r['id'] for r in qs if len(ans_of(r)) > 1]
     bad_opts = [r['id'] for r in qs if not 2 <= len(r['options']) <= 6]
     no_expl = [r['id'] for r in qs if not r['explanation']]
-    out_of_range = [r['id'] for r in qs if not 0 <= r['answer'] < len(r['options'])]
+    out_of_range = [r['id'] for r in qs if any(not 0 <= a < len(r['options']) for a in ans_of(r))]
     print(f'{blocks} blocks -> {len(rows)} parsed -> {len(qs)} unique questions')
+    print(f'  single-answer:      {len(qs) - len(multi)}')
+    print(f'  multiple-response:  {len(multi)}' + (f'  (ids {", ".join(multi[:12])}{" ..." if len(multi) > 12 else ""})' if multi else ''))
     print(f'  duplicates dropped: {len(rows) - len(qs)}')
     print(f'  with explanation:   {len(qs) - len(no_expl)}')
     print(f'  option counts:      {sorted({len(r["options"]) for r in qs})}')
@@ -143,7 +193,7 @@ def report(qs, rows, blocks, notes):
             print(f'  WARNING {label}: {", ".join(bad[:12])}{" ..." if len(bad) > 12 else ""}')
     if notes:
         print('\n'.join(notes))
-    print(f'  answer distribution: {[sum(1 for r in qs if r["answer"] == i) for i in range(4)]}')
+    print(f'  correct-letter spread: {[sum(1 for r in qs if i in ans_of(r)) for i in range(4)]}')
     print(f'  first/last id: {ids[0] if ids else "-"} .. {ids[-1] if ids else "-"}')
 
 
