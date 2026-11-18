@@ -2,18 +2,20 @@
 
 Ứng dụng luyện thi **Claude Certified Architect – Professional (CCAR-P)** chạy hoàn toàn offline trong trình duyệt — một file HTML + một file dữ liệu câu hỏi, không backend, không gửi dữ liệu đi đâu.
 
+Ngân hàng hiện có **160 câu**: 111 câu một đáp án, 49 câu chọn nhiều đáp án (2 đáp án), mỗi câu 4–6 phương án, tất cả đều có giải thích.
+
 Bản này dựng lại đúng bộ tính năng của `cca-f_practice` nhưng với giao diện **Aurora Nebula 2.0**: nền tinh vân nhiều lớp, kính mờ sâu, ánh sáng theo con trỏ, thẻ nghiêng 3D, vòng điểm phát sáng và pháo hoa canvas khi đạt.
 
 ## Tính năng
 
 - **Hai chế độ**: đề thi ngẫu nhiên (60 câu, đúng độ dài kỳ thi thật) và toàn bộ ngân hàng.
 - **Hai dạng câu hỏi**: một đáp án (chấm ngay khi bấm) và **chọn nhiều đáp án** (bấm chọn nhiều ô rồi "Chấm đáp án", đúng khi chọn đủ và không thừa).
-- **Trộn câu + trộn đáp án** mỗi lần bắt đầu; phần giải thích tự đổi chữ cái A/B/C/D theo thứ tự mới.
+- **Trộn câu + trộn đáp án** mỗi lần bắt đầu; phần giải thích tự đổi chữ cái A–F theo thứ tự mới.
 - **Chấm ngay**: đúng lên xanh + confetti, sai rung nhẹ + hiện giải thích.
 - **Đồng hồ**, **điểm**, **chuỗi đúng liên tiếp** ngay trên đầu bài.
 - **Kết quả**: vòng tròn phần trăm, đạt/chưa đạt mốc 80%, thống kê đúng/sai/chuỗi/thời gian, pháo hoa khi đạt.
 - **Xem lại câu sai**: đáp án đúng, lựa chọn của bạn, giải thích đầy đủ.
-- **Phím tắt**: `A`–`D` hoặc `1`–`4` chọn, `Enter` sang câu tiếp, `?` mở bảng phím tắt.
+- **Phím tắt**: `A`–`F` hoặc `1`–`6` chọn, `Enter` chấm / sang câu tiếp, `?` mở bảng phím tắt.
 - **Cài đặt**: 4 giao diện (Aurora, Trắng đen, Đen trắng, Vàng đen), bật/tắt âm thanh, tắt toàn bộ hiệu ứng cho máy yếu. Lưu theo trình duyệt.
 
 ## Cấu trúc
@@ -29,10 +31,10 @@ extract.py    bộ trích xuất từ trang practice đã lưu
 Cần file HTML đầy đủ của trang luyện tập (vài trăm KB — bản lưu thiếu vài KB sẽ không có câu nào):
 
 ```bash
-python extract.py ccar-p-all.html -o questions.js
+python extract.py "ccar-p-all (1).html" -o questions.js
 ```
 
-Script in ra số câu, số câu có giải thích, phân bố đáp án và cảnh báo nếu có câu thiếu dữ liệu. Nếu file nguồn bị cắt, script báo ngay `No <details class="qblock"> blocks found`.
+Script in ra số câu, số câu một đáp án / nhiều đáp án, số câu trùng bị loại, số câu có giải thích và cảnh báo nếu có câu thiếu dữ liệu. Nếu file nguồn bị cắt, script báo ngay `No <details class="qblock"> blocks found`.
 
 ## Chạy thử
 

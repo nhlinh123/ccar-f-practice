@@ -69,33 +69,62 @@ def text_key(s):
 
 KEY_ATTRS = ('data-correct-options', 'data-correct-answers', 'data-correct-option')
 
+OPT_CONTENT = re.compile(r'<div class="practice-option-content[^"]*">(.*?)</div>', re.S)
 
-def correct_keys(block):
-    """Return (letters, how) for the correct option(s) — single or multiple-response."""
+
+def options_of(block, qid):
+    """[(letter, inner_html)] in source A..F order."""
+    labelled = re.findall(r'<label for="answer-%s-([A-F])"[^>]*>(.*?)</label>' % re.escape(qid), block, re.S)
+    if labelled:
+        out = []
+        for letter, inner in labelled:
+            m = OPT_CONTENT.search(inner)
+            out.append((letter, m.group(1) if m else inner))
+        return sorted(out)
+    legacy = re.findall(r'<label for="answer-\d+-([A-F])".*?<div class="practice-option-content">(.*?)</div>', block, re.S)
+    return sorted(legacy)
+
+
+def explanation_of(block):
+    """Explanation HTML; each block carries a <template> duplicate, so take the first match."""
+    m = re.search(r'<div class="practice-explanation-content[^"]*">(.*?)</div>\s*</section>', block, re.S)
+    if m:
+        return m.group(1)
+    m = re.search(r'<div class="practice-explanation-content[^"]*">(.*?)</div>', block, re.S)
+    return m.group(1) if m else ''
+
+
+def correct_keys(block, letters):
+    """Letters of the correct option(s), supporting single and multiple-response markup."""
     for attr in KEY_ATTRS:
-        m = re.search(rf'{attr}="([^"]*)"', block)
-        if m:
-            letters = re.findall(r'[A-F]', m.group(1).upper())
-            if letters:
-                return letters, attr
+        found = re.findall(rf'{attr}="([^"]*)"', block)
+        if found:
+            keys = []
+            for chunk in found:
+                for c in re.findall(r'[A-F]', chunk.upper()):
+                    if c not in keys:
+                        keys.append(c)
+            if keys:
+                return keys, attr
+    marked = re.findall(r'<label for="answer-\d+-([A-F])"[^>]*data-answer-result="correct"', block)
+    if marked:
+        return sorted(set(marked)), 'label data-answer-result'
     checked = re.findall(r'<input[^>]*id="answer-\d+-([A-F])"[^>]*checked', block)
     if checked:
-        return checked, 'checked input'
-    if re.search(r'<input[^>]*type="checkbox"', block):
-        return [], 'checkbox'
+        return sorted(set(checked)), 'checked input'
     return [], 'none'
 
 
 def stated_keys(expl):
-    """Letters the explanation's "3. Đáp án" section lists — used to cross-check the site key."""
-    m = re.search(r'3\. Đáp án</h4>(.*?)(?=<h4|</section>)', expl, re.S)
+    """Letters the explanation's answer section lists — used to cross-check the site key."""
+    m = re.search(r'(?:3\. Đáp án|Giải thích)</h[34]>(.*?)(?=<h[34]|</section>)', expl, re.S)
     if not m:
         return []
     letters = []
     for lm in re.finditer(r'(?:<li>|<p>|<strong>)\s*(?:<p>|<strong>)?\s*([A-F])[.)]', m.group(1)):
         if lm.group(1) not in letters:
             letters.append(lm.group(1))
-    return letters[:4]
+    return letters[:6]
 
 
 def ans_of(row):
@@ -117,21 +146,17 @@ def parse(path):
         qid = re.search(r'data-question-id="(\d+)"', b)
         qid = qid.group(1) if qid else str(len(rows) + 1)
         q = re.sub(r'<span class="qnum">.*?</span>', '', re.search(r'<summary>(.*?)</summary>', b, re.S).group(1))
-        opts = sorted(re.findall(
-            r'<label for="answer-\d+-([A-Z])".*?<div class="practice-option-content">(.*?)</div>', b, re.S))
+        opts = options_of(b, qid)
         letters = [L for L, _ in opts]
-        keys, how = correct_keys(b)
-        m = re.search(r'<div class="practice-explanation-content">(.*?)</div>\s*</section>', b, re.S)
-        expl = m.group(1) if m else ''
+        keys, how = correct_keys(b, letters)
+        expl = explanation_of(b)
 
-        # Some items are multiple-response ("select two"): the page then marks more than one option.
+        # Some items are multiple-response ("chọn nhiều đáp án"): the page marks more than one option.
         if len(keys) > 1:
             notes_multi.append(qid)
-        if 'checkbox' in how:
-            notes.append(f'id {qid}: options use checkboxes ({how})')
 
         # The site key is occasionally wrong; when the explanation states its answer letter, trust it.
-        stated = stated_keys(expl)
+        stated = [k for k in stated_keys(expl) if k in letters]
         if stated and set(stated) != set(keys):
             notes.append(f'id {qid}: site key {"/".join(keys)} -> explanation says {"/".join(stated)}')
             keys = stated
@@ -142,14 +167,14 @@ def parse(path):
             continue
 
         expl = clean(expl)
-        # Explanations cite options by original letter ("<p>C. ", "(C)"); mark them so the app can relabel.
-        expl = re.sub(r'(<p>|<strong>)([A-D])\.', r'\1{{\2}}.', expl)
-        expl = re.sub(r'\(([A-D])\)', r'({{\1}})', expl)
+        # Some banks cite options by letter ("<p>C. ", "(C)"); mark them so the app can relabel.
+        expl = re.sub(r'(<p>|<strong>)([A-F])\.', r'\1{{\2}}.', expl)
+        expl = re.sub(r'\(([A-F])\)', r'({{\1}})', expl)
 
         row = {
             'id': qid,
             'q': unwrap_p(clean(q)),
-            'options': [unwrap_p(clean(o)) for _, o in opts],  # original A, B, C, D order
+            'options': [unwrap_p(clean(o)) for _, o in opts],  # source A, B, C ... order
             'explanation': expl,
         }
         answers = sorted(letters.index(k) for k in keys)
@@ -193,7 +218,8 @@ def report(qs, rows, blocks, notes, notes_multi=()):
             print(f'  WARNING {label}: {", ".join(bad[:12])}{" ..." if len(bad) > 12 else ""}')
     if notes:
         print('\n'.join(notes))
-    print(f'  correct-letter spread: {[sum(1 for r in qs if i in ans_of(r)) for i in range(4)]}')
+    maxopt = max((len(r['options']) for r in qs), default=4)
+    print(f'  correct-letter spread: {[sum(1 for r in qs if i in ans_of(r)) for i in range(maxopt)]}')
     print(f'  first/last id: {ids[0] if ids else "-"} .. {ids[-1] if ids else "-"}')
 
 

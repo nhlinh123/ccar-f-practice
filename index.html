@@ -111,7 +111,7 @@ h1.title .dim{display:block;font-size:.52em;font-weight:650;letter-spacing:-.015
   background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;
   animation:flow 9s linear infinite
 }
-.lede{margin:0 auto;max-width:620px;font-size:1rem;color:var(--muted)}
+.lede{margin:0 auto;max-width:760px;font-size:.97rem;color:var(--muted)}
 .lede b{color:var(--ink);font-weight:700}
 .lede .sep{display:inline-block;margin:0 .55em;color:rgba(255,255,255,.22)}
 
@@ -525,7 +525,7 @@ dl.keys dd{margin:0}
     </div>
 
     <div class="tips">
-      <span><kbd>A</kbd>–<kbd>D</kbd> hoặc <kbd>1</kbd>–<kbd>4</kbd> chọn đáp án</span>
+      <span><kbd>A</kbd>–<kbd>F</kbd> hoặc <kbd>1</kbd>–<kbd>6</kbd> chọn đáp án</span>
       <span><kbd>Enter</kbd> câu tiếp</span>
       <span><kbd>?</kbd> xem phím tắt</span>
     </div>
@@ -639,9 +639,9 @@ dl.keys dd{margin:0}
     <h2 id="keysTitle">Phím tắt</h2>
     <p class="sub">Dùng được ngay khi đang làm bài.</p>
     <dl class="keys">
-      <dt><kbd>A</kbd> <kbd>B</kbd> <kbd>C</kbd> <kbd>D</kbd></dt><dd>Chọn đáp án</dd>
-      <dt><kbd>1</kbd>–<kbd>4</kbd></dt><dd>Chọn đáp án theo thứ tự</dd>
-      <dt><kbd>Enter</kbd></dt><dd>Sang câu tiếp</dd>
+      <dt><kbd>A</kbd> <kbd>B</kbd> <kbd>C</kbd> <kbd>D</kbd> <kbd>E</kbd> <kbd>F</kbd></dt><dd>Chọn đáp án</dd>
+      <dt><kbd>1</kbd>–<kbd>6</kbd></dt><dd>Chọn đáp án theo thứ tự</dd>
+      <dt><kbd>Enter</kbd></dt><dd>Chấm đáp án (câu nhiều đáp án) hoặc sang câu tiếp</dd>
       <dt><kbd>Esc</kbd></dt><dd>Đóng hộp thoại</dd>
       <dt><kbd>?</kbd></dt><dd>Mở bảng phím tắt này</dd>
     </dl>
@@ -662,7 +662,7 @@ dl.keys dd{margin:0}
   'use strict';
 
   const CFG = { exam: 60, pass: 0.8 };
-  const LETTERS = 'ABCD';
+  const LETTERS = 'ABCDEF';
   const RING_LEN = 2 * Math.PI * 68;
   const $ = (id) => document.getElementById(id);
   const root = document.documentElement;
@@ -753,7 +753,7 @@ dl.keys dd{margin:0}
     const s = Math.max(0, Math.round(ms / 1000));
     return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
   };
-  const relabel = (q) => (q.explanation || '').replace(/\{\{([A-D])\}\}/g, (_, L) => {
+  const relabel = (q) => (q.explanation || '').replace(/\{\{([A-F])\}\}/g, (_, L) => {
     const pos = q.order.indexOf(LETTERS.indexOf(L));
     return pos >= 0 ? LETTERS[pos] : L;
   });
@@ -771,7 +771,7 @@ dl.keys dd{margin:0}
   $('allNum').textContent = bank.length;
   if (multiCount) {
     document.querySelector('.lede').insertAdjacentHTML('beforeend',
-      `<span class="sep">·</span><b>${multiCount}</b> câu chọn nhiều đáp án`);
+      `<span class="sep">·</span><b>${multiCount}</b> câu nhiều đáp án`);
   }
   if (!bank.length) {
     $('home').insertAdjacentHTML('beforeend',
@@ -1104,7 +1104,7 @@ dl.keys dd{margin:0}
     if (e.key === '?') { $('keysDlg').showModal(); return; }
     if ($('quiz').hidden) return;
     const lower = e.key.toLowerCase();
-    const k = 'abcd'.includes(lower) ? 'abcd'.indexOf(lower) : '1234'.indexOf(e.key);
+    const k = 'abcdef'.includes(lower) ? 'abcdef'.indexOf(lower) : '123456'.indexOf(e.key);
     if (!answered && k >= 0 && k < $('opts').children.length) { select($('opts').children[k]); return; }
     if (e.key !== 'Enter') return;
     if (!answered) {
