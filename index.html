@@ -82,6 +82,9 @@ button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
 }
 .icon-btn:hover{color:var(--ink);border-color:var(--stroke-2);background:rgba(255,255,255,.09);transform:translateY(-1px)}
 .icon-btn svg{width:16px;height:16px}
+.nav-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px}
+a.icon-btn{text-decoration:none}
+.explain .tiplink{margin:14px 0 0;font-weight:700}
 
 /* ============================================================
    Glass surface
@@ -487,10 +490,16 @@ dl.keys dd{margin:0}
       <span class="mark" aria-hidden="true">P</span>
       <span>CCAR-P<small>Aurora Practice</small></span>
     </div>
+    <div class="nav-actions">
+    <a class="icon-btn" href="meo.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg>
+      Mẹo học
+    </a>
     <button class="icon-btn" id="openSettings" aria-haspopup="dialog">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
       Cài đặt
     </button>
+    </div>
   </header>
 
   <!-- ================= HOME ================= -->
@@ -681,7 +690,7 @@ dl.keys dd{margin:0}
   };
   const bank = raw
     .filter((q) => q && typeof q.q === 'string' && Array.isArray(q.options) && q.options.length > 1)
-    .map((q) => ({ q: q.q, options: q.options, explanation: q.explanation || '' , answers: toAnswers(q) }))
+    .map((q) => ({ id: q.id, q: q.q, options: q.options, explanation: q.explanation || '' , answers: toAnswers(q) }))
     .filter((q) => q.answers.length);
   const EXAM_SIZE = Math.min(CFG.exam, bank.length || CFG.exam);
   const multiCount = bank.filter((q) => q.answers.length > 1).length;
@@ -757,6 +766,7 @@ dl.keys dd{margin:0}
     const pos = q.order.indexOf(LETTERS.indexOf(L));
     return pos >= 0 ? LETTERS[pos] : L;
   });
+  const tipLink = (q) => q.id ? `<p class="tiplink"><a href="meo.html#q${q.id}" target="_blank" rel="noopener">Mẹo nhớ câu này →</a></p>` : '';
 
   function show(id) {
     for (const s of ['home', 'quiz', 'result', 'review']) $(s).hidden = s !== id;
@@ -929,7 +939,7 @@ dl.keys dd{margin:0}
     const cheers = ['Chính xác! 🎉', 'Tuyệt vời! ✨', 'Đúng rồi! 💯', 'Xuất sắc! 🚀'];
     $('verdict').className = 'verdict ' + (ok ? 'ok' : 'bad');
     $('verdict').innerHTML = `<span class="ico" aria-hidden="true">${ok ? '✓' : '✕'}</span><span>${ok ? cheers[score % 4] : 'Chưa đúng — xem lại giải thích bên dưới'}</span>`;
-    $('explain').innerHTML = relabel(q);
+    $('explain').innerHTML = relabel(q) + tipLink(q);
     $('after').hidden = false;
     $('next').hidden = false;
     $('next').disabled = false;
@@ -1058,7 +1068,7 @@ dl.keys dd{margin:0}
       }).join('');
       card.innerHTML = `<span class="chip">Câu ${q.no}</span><div class="qtext">${q.q}</div>`
         + `<div class="opts done">${opts}</div>`
-        + `<details><summary>Xem giải thích</summary><div class="explain">${relabel(q)}</div></details>`;
+        + `<details><summary>Xem giải thích</summary><div class="explain">${relabel(q)}${tipLink(q)}</div></details>`;
       return card;
     }));
   }
