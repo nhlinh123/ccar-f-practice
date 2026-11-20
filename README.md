@@ -10,7 +10,7 @@ Bản này dựng lại đúng bộ tính năng của `cca-f_practice` nhưng v�
 
 - **Hai chế độ**: đề thi ngẫu nhiên (60 câu, đúng độ dài kỳ thi thật) và toàn bộ ngân hàng.
 - **Hai dạng câu hỏi**: một đáp án (chấm ngay khi bấm) và **chọn nhiều đáp án** (bấm chọn nhiều ô rồi "Chấm đáp án", đúng khi chọn đủ và không thừa).
-- **Trộn câu + trộn đáp án** mỗi lần bắt đầu; phần giải thích tự đổi chữ cái A–F theo thứ tự mới.
+- **Trộn câu + trộn đáp án** mỗi lần bắt đầu; phần giải thích tự đổi chữ cái A–F theo thứ tự mới. Riêng chế độ 160 câu có công tắc trộn ngay trang chủ (mặc định bật): tắt để đi đúng thứ tự gốc của ngân hàng, cả câu lẫn đáp án. Lựa chọn được lưu theo trình duyệt.
 - **Chấm ngay**: đúng lên xanh + confetti, sai rung nhẹ + hiện giải thích.
 - **Đồng hồ**, **điểm**, **chuỗi đúng liên tiếp** ngay trên đầu bài.
 - **Kết quả**: vòng tròn phần trăm, đạt/chưa đạt mốc 80%, thống kê đúng/sai/chuỗi/thời gian, pháo hoa khi đạt.
